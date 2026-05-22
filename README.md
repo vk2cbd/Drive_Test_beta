@@ -85,9 +85,28 @@ timestamp_utc,gps_position,received_level_dbm
 
 `gps_position` is formatted as latitude and longitude in degrees, minutes, and seconds.
 
-## Hardware Notes
+## Ubuntu SDRplay Setup
 
 For an SDRplay RSPdx, install the SDRplay API/runtime and a SoapySDR SDRplay module if you want to use the included `soapy_sdrplay` backend. The application keeps SDR configuration in the GUI and passes supported settings into the backend where possible.
+
+If the app reports `SoapySDR::Device::make() no match`, SoapySDR cannot find a device matching the GUI's **Device args** field. First check whether SoapySDR can see the RSPdx:
+
+```bash
+SoapySDRUtil --find
+SoapySDRUtil --probe="driver=sdrplay"
+```
+
+If `SoapySDRUtil` is missing, install the SoapySDR tools package:
+
+```bash
+sudo apt install soapysdr-tools
+```
+
+If `--find` does not list an SDRplay device, install or repair the SDRplay API/runtime and the SoapySDR SDRplay module for your Ubuntu version. When `--find` succeeds, copy the reported driver/device arguments into the GUI **Device args** field. The default is:
+
+```text
+driver=sdrplay
+```
 
 SDRconnect introduced a WebSocket/module system after v1.0.5. A future backend can be added under `radio_survey/sdr.py` if you want this app to drive SDRconnect directly rather than sample the SDR through SoapySDR.
 
