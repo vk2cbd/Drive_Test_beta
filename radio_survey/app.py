@@ -25,8 +25,8 @@ class SurveyApp(tk.Tk):
     def __init__(self) -> None:
         super().__init__()
         self.title("Radio Network Survey Logger")
-        self.geometry("1180x760")
-        self.minsize(980, 640)
+        self.geometry("1280x920")
+        self.minsize(1180, 900)
 
         self._gps_source = None
         self._level_meter: LevelMeter | None = None
@@ -36,6 +36,11 @@ class SurveyApp(tk.Tk):
         self._vars: dict[str, tk.Variable] = {}
         self._widgets: dict[str, ttk.Widget] = {}
         self._settings = load_settings()
+        self._last_valid_y_max = self._valid_y_value(self._settings.get("plot_y_max_dbm", -40.0), -40.0)
+        self._last_valid_y_min = self._valid_y_value(self._settings.get("plot_y_min_dbm", -120.0), -120.0)
+        if self._last_valid_y_max <= self._last_valid_y_min:
+            self._last_valid_y_min = -120.0
+            self._last_valid_y_max = -40.0
         self._running = False
 
         self._build_ui()
@@ -47,9 +52,25 @@ class SurveyApp(tk.Tk):
         self.columnconfigure(1, weight=1)
         self.rowconfigure(0, weight=1)
 
-        setup = ttk.Frame(self, padding=10)
-        setup.grid(row=0, column=0, sticky="nsw")
+        setup_container = ttk.Frame(self)
+        setup_container.grid(row=0, column=0, sticky="nsw")
+        setup_container.rowconfigure(0, weight=1)
+        setup_container.columnconfigure(0, weight=1)
+
+        setup_canvas = tk.Canvas(setup_container, width=430, highlightthickness=0)
+        setup_scrollbar = ttk.Scrollbar(setup_container, orient="vertical", command=setup_canvas.yview)
+        setup_canvas.configure(yscrollcommand=setup_scrollbar.set)
+        setup_canvas.grid(row=0, column=0, sticky="ns")
+        setup_scrollbar.grid(row=0, column=1, sticky="ns")
+
+        setup = ttk.Frame(setup_canvas, padding=10)
         setup.columnconfigure(1, weight=1)
+        setup_window = setup_canvas.create_window((0, 0), window=setup, anchor="nw")
+        setup.bind("<Configure>", lambda event: setup_canvas.configure(scrollregion=setup_canvas.bbox("all")))
+        setup_canvas.bind("<Configure>", lambda event: setup_canvas.itemconfigure(setup_window, width=event.width))
+        setup_canvas.bind_all("<MouseWheel>", lambda event: setup_canvas.yview_scroll(int(-1 * (event.delta / 120)), "units"))
+        setup_canvas.bind_all("<Button-4>", lambda _event: setup_canvas.yview_scroll(-1, "units"))
+        setup_canvas.bind_all("<Button-5>", lambda _event: setup_canvas.yview_scroll(1, "units"))
 
         plot_area = ttk.Frame(self, padding=(0, 10, 10, 10))
         plot_area.grid(row=0, column=1, sticky="nsew")
@@ -107,8 +128,8 @@ class SurveyApp(tk.Tk):
         self.autoscale_y_var = tk.BooleanVar(value=False)
         ttk.Checkbutton(frame, text="Autoscale Y", variable=self.autoscale_y_var, command=self._redraw_plot).grid(row=7, column=0, columnspan=3, sticky="w", pady=(8, 0))
 
-        self.y_max_var = tk.DoubleVar(value=float(self._settings.get("plot_y_max_dbm", -40.0)))
-        self.y_min_var = tk.DoubleVar(value=float(self._settings.get("plot_y_min_dbm", -120.0)))
+        self.y_max_var = tk.StringVar(value=f"{self._last_valid_y_max:.0f}")
+        self.y_min_var = tk.StringVar(value=f"{self._last_valid_y_min:.0f}")
         ttk.Label(frame, text="Y max").grid(row=8, column=0, sticky="w")
         y_max_entry = ttk.Entry(frame, textvariable=self.y_max_var, width=8)
         y_max_entry.grid(row=8, column=1, sticky="ew", padx=4)
@@ -271,23 +292,49 @@ class SurveyApp(tk.Tk):
         self._settings["plot_window_minutes"] = int(self.window_minutes_var.get())
         save_settings(self._settings)
 
-    def _commit_y_axis(self) -> None:
-        self._normalize_y_axis()
-        self._settings["plot_y_max_dbm"] = float(self.y_max_var.get())
-        self._settings["plot_y_min_dbm"] = float(self.y_min_var.get())
+    def _commit_y_axis(self, redraw: bool = True) -> None:
+        if not self._apply_y_axis_fields():
+            self.status_var.set("Y axis values must be between -120 and -10 dBm")
+            return
+        self._settings["plot_y_max_dbm"] = self._last_valid_y_max
+        self._settings["plot_y_min_dbm"] = self._last_valid_y_min
         save_settings(self._settings)
-        self._redraw_plot()
+        if redraw:
+            self._redraw_plot()
 
-    def _step_y_axis(self, var: tk.DoubleVar, delta_db: float) -> None:
-        var.set(float(var.get()) + delta_db)
+    def _step_y_axis(self, var: tk.StringVar, delta_db: float) -> None:
+        current = self._parse_y_value(var.get())
+        if current is None:
+            current = self._last_valid_y_max if var is self.y_max_var else self._last_valid_y_min
+        var.set(f"{self._clamp_y_value(current + delta_db):.0f}")
         self._commit_y_axis()
 
-    def _normalize_y_axis(self) -> None:
-        y_min = float(self.y_min_var.get())
-        y_max = float(self.y_max_var.get())
-        if y_max <= y_min:
-            y_max = y_min + 5.0
-            self.y_max_var.set(y_max)
+    def _apply_y_axis_fields(self) -> bool:
+        y_max = self._parse_y_value(self.y_max_var.get())
+        y_min = self._parse_y_value(self.y_min_var.get())
+        if y_max is None or y_min is None or y_max <= y_min:
+            return False
+        self._last_valid_y_max = y_max
+        self._last_valid_y_min = y_min
+        self.y_max_var.set(f"{y_max:.0f}")
+        self.y_min_var.set(f"{y_min:.0f}")
+        return True
+
+    def _parse_y_value(self, value: object) -> float | None:
+        try:
+            parsed = float(value)
+        except (TypeError, ValueError, tk.TclError):
+            return None
+        if parsed < -120.0 or parsed > -10.0:
+            return None
+        return parsed
+
+    def _valid_y_value(self, value: object, default: float) -> float:
+        parsed = self._parse_y_value(value)
+        return parsed if parsed is not None else default
+
+    def _clamp_y_value(self, value: float) -> float:
+        return min(-10.0, max(-120.0, value))
 
     def _save_current_settings(self) -> None:
         settings = {
@@ -296,8 +343,8 @@ class SurveyApp(tk.Tk):
             "gps_baud": int(self.gps_baud_var.get()),
             "csv_path": self.csv_path_var.get(),
             "plot_window_minutes": int(self.window_minutes_var.get()),
-            "plot_y_max_dbm": float(self.y_max_var.get()),
-            "plot_y_min_dbm": float(self.y_min_var.get()),
+            "plot_y_max_dbm": self._last_valid_y_max,
+            "plot_y_min_dbm": self._last_valid_y_min,
         }
         settings.update(self._collect_sdr_display_params())
         self._settings = settings
@@ -461,9 +508,9 @@ class SurveyApp(tk.Tk):
             low = min_level - (span * 0.1)
             high = max_level + (span * 0.1)
         else:
-            self._normalize_y_axis()
-            low = float(self.y_min_var.get())
-            high = float(self.y_max_var.get())
+            self._apply_y_axis_fields()
+            low = self._last_valid_y_min
+            high = self._last_valid_y_max
 
         for label_value in (low, (low + high) / 2, high):
             y = margin_top + (high - label_value) / (high - low) * plot_h
