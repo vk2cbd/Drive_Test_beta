@@ -25,7 +25,7 @@ SDR_PARAMETER_DEFS: tuple[ParameterDef, ...] = (
     ParameterDef("device_args", "Device args", "text", "driver=sdrplay"),
     ParameterDef("tuner", "Tuner", "choice", "A", ("A", "B")),
     ParameterDef("antenna", "Antenna", "choice", "A", ("A", "B", "Hi-Z", "50 ohm")),
-    ParameterDef("center_frequency_hz", "Center frequency", "float", 100_000_000.0, minimum=1_000.0, units="Hz"),
+    ParameterDef("center_frequency_mhz", "Center frequency", "float", 100.000000, minimum=0.001, units="MHz"),
     ParameterDef(
         "sample_rate_hz",
         "Sample rate",
@@ -61,4 +61,3 @@ SDR_PARAMETER_DEFS: tuple[ParameterDef, ...] = (
     ParameterDef("samples_per_level", "Samples per level", "int", 8192, minimum=1024, maximum=262144),
     ParameterDef("dbm_offset", "dBm calibration offset", "float", -30.0, units="dB"),
 )
-

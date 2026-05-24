@@ -31,6 +31,18 @@ python3 -m radio_survey
 
 If you do not have `pyserial` or `SoapySDR` available yet, the app can still run with simulated GPS and received level data.
 
+## GUI Settings
+
+Most GUI fields are remembered between app runs in:
+
+```text
+~/.config/radio_survey/settings.json
+```
+
+Text and numeric fields are committed when you press Enter in the field. When the survey is running, committed GPS and SDR changes are applied by restarting the affected device path where possible. The center frequency field is entered in MHz with six decimal places.
+
+CSV logging is controlled by the **Log to CSV** button. It always defaults to off when the app starts and is not remembered between sessions.
+
 ## Ubuntu GPS Setup
 
 USB GPS receivers normally appear as one of these devices:
