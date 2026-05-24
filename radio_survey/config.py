@@ -24,7 +24,7 @@ SDR_PARAMETER_DEFS: tuple[ParameterDef, ...] = (
     ParameterDef("backend", "SDR backend", "choice", "simulator", ("simulator", "soapy_sdrplay")),
     ParameterDef("device_args", "Device args", "text", "driver=sdrplay"),
     ParameterDef("tuner", "Tuner", "choice", "A", ("A", "B")),
-    ParameterDef("antenna", "Antenna", "choice", "A", ("A", "B", "Hi-Z", "50 ohm")),
+    ParameterDef("antenna", "Antenna", "choice", "A", ("A", "B", "C")),
     ParameterDef("center_frequency_mhz", "Center frequency", "float", 100.000000, minimum=0.001, units="MHz"),
     ParameterDef(
         "sample_rate_msps",
@@ -46,7 +46,7 @@ SDR_PARAMETER_DEFS: tuple[ParameterDef, ...] = (
     ParameterDef("lo_mode", "LO mode", "choice", "Auto", ("Auto", "120 MHz", "144 MHz", "168 MHz")),
     ParameterDef("gain_mode", "Gain mode", "choice", "manual", ("manual", "agc")),
     ParameterDef("rf_gain_reduction_db", "RF gain reduction", "float", 20.0, minimum=0.0, maximum=66.0, units="dB"),
-    ParameterDef("if_gain_reduction_db", "IF gain reduction", "float", 30.0, minimum=0.0, maximum=66.0, units="dB"),
+    ParameterDef("if_gain_reduction_db", "IF gain reduction", "float", 30.0, minimum=20.0, maximum=59.0, units="dB"),
     ParameterDef("lna_state", "LNA state", "int", 0, minimum=0, maximum=9),
     ParameterDef("hdr_mode", "RSPdx HDR mode", "bool", False),
     ParameterDef("bias_t", "Bias-T", "bool", False),

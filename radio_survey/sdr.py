@@ -15,6 +15,7 @@ class SpectrumSnapshot:
 
 class LevelMeter(Protocol):
     def configure(self, params: dict[str, object]) -> None: ...
+    def update_settings(self, params: dict[str, object]) -> None: ...
     def read_level_dbm(self) -> float: ...
     def get_last_spectrum(self) -> SpectrumSnapshot | None: ...
     def close(self) -> None: ...
@@ -32,6 +33,9 @@ class SimulatedLevelMeter:
         self._offset = float(params.get("simulated_level_dbm", -82.0))
         self._center_frequency_hz = float(params.get("center_frequency_hz", self._center_frequency_hz))
         self._bandwidth_hz = float(params.get("bandwidth_hz", self._bandwidth_hz))
+
+    def update_settings(self, params: dict[str, object]) -> None:
+        self.configure(params)
 
     def read_level_dbm(self) -> float:
         elapsed = time.monotonic() - self._start
@@ -116,10 +120,27 @@ class SoapySdrplayLevelMeter:
         self._sdr.setSampleRate(self._direction, self._channel, self._sample_rate_hz)
         self._sdr.setFrequency(self._direction, self._channel, self._center_frequency_hz)
         self._set_if_supported("setBandwidth", self._bandwidth_hz)
-        self._set_if_supported("setAntenna", str(params.get("antenna", "A")))
+        self._set_antenna(str(params.get("antenna", "A")))
         self._set_gain(params)
         self._write_settings(params)
         self._stream = self._sdr.setupStream(self._direction, self._format, [self._channel])
+
+    def update_settings(self, params: dict[str, object]) -> None:
+        if self._sdr is None:
+            raise RuntimeError("SDR is not configured")
+
+        self._deactivate_stream()
+        self._center_frequency_hz = float(params["center_frequency_hz"])
+        self._sample_rate_hz = float(params["sample_rate_hz"])
+        self._bandwidth_hz = float(params["bandwidth_hz"])
+        self._samples_per_level = int(params.get("samples_per_level", self._samples_per_level))
+        self._dbm_offset = float(params.get("dbm_offset", self._dbm_offset))
+        self._sdr.setFrequency(self._direction, self._channel, self._center_frequency_hz)
+        self._sdr.setSampleRate(self._direction, self._channel, self._sample_rate_hz)
+        self._set_if_supported("setBandwidth", self._bandwidth_hz)
+        self._set_antenna(str(params.get("antenna", "A")))
+        self._set_gain(params)
+        self._write_settings(params)
 
     def read_level_dbm(self) -> float:
         if self._sdr is None or self._stream is None:
@@ -201,13 +222,37 @@ class SoapySdrplayLevelMeter:
         if method is not None:
             method(self._direction, self._channel, value)
 
+    def _set_antenna(self, antenna: str) -> None:
+        if self._sdr is None:
+            return
+
+        requested_names = (antenna, f"Antenna {antenna}") if len(antenna) == 1 else (antenna,)
+        try:
+            available = self._sdr.listAntennas(self._direction, self._channel)
+        except Exception:
+            available = ()
+
+        for name in requested_names:
+            if not available or name in available:
+                try:
+                    self._sdr.setAntenna(self._direction, self._channel, name)
+                    return
+                except Exception:
+                    continue
+
     def _set_gain(self, params: dict[str, object]) -> None:
         if str(params.get("gain_mode", "manual")) == "agc":
             self._sdr.setGainMode(self._direction, self._channel, True)
             return
 
         self._sdr.setGainMode(self._direction, self._channel, False)
+        try:
+            gain_names = set(self._sdr.listGains(self._direction, self._channel))
+        except Exception:
+            gain_names = {"RFGR", "IFGR"}
         for name, key in (("RFGR", "rf_gain_reduction_db"), ("IFGR", "if_gain_reduction_db")):
+            if gain_names and name not in gain_names:
+                continue
             try:
                 self._sdr.setGain(self._direction, self._channel, name, float(params[key]))
             except Exception:

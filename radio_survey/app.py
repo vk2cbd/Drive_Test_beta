@@ -31,6 +31,7 @@ class SurveyApp(tk.Tk):
 
         self._gps_source = None
         self._level_meter: LevelMeter | None = None
+        self._active_sdr_backend: str | None = None
         self._logger: CsvSurveyLogger | None = None
         self._events: queue.Queue[tuple[str, object]] = queue.Queue()
         self._points: list[LevelPoint] = []
@@ -241,6 +242,8 @@ class SurveyApp(tk.Tk):
 
     def _make_var(self, param: ParameterDef) -> tk.Variable:
         value = self._settings.get(param.key, self._legacy_setting_value(param))
+        if param.kind == "choice" and param.choices and value not in param.choices and str(value) not in {str(choice) for choice in param.choices}:
+            value = param.default
         if param.kind == "bool":
             return tk.BooleanVar(value=bool(value))
         if param.kind == "int":
@@ -290,6 +293,7 @@ class SurveyApp(tk.Tk):
             params = self._collect_sdr_params()
             self._level_meter = create_level_meter(str(params["backend"]))
             self._level_meter.configure(params)
+            self._active_sdr_backend = str(params["backend"])
             if self.logging_enabled_var.get():
                 self._open_logger()
             self._gps_source = SimulatedGpsSource() if self.gps_sim_var.get() else SerialGpsSource(self.gps_port_var.get(), int(self.gps_baud_var.get()))
@@ -320,6 +324,7 @@ class SurveyApp(tk.Tk):
             self._logger.close()
         self._gps_source = None
         self._level_meter = None
+        self._active_sdr_backend = None
         self._logger = None
 
     def _commit_all_settings(self) -> None:
@@ -332,7 +337,6 @@ class SurveyApp(tk.Tk):
                 self._restart_gps_source()
                 self._reconfigure_level_meter()
                 self._sync_logger_state()
-                self.status_var.set("Settings applied")
         except Exception as exc:
             self.status_var.set(f"Settings not applied: {exc}")
 
@@ -473,11 +477,18 @@ class SurveyApp(tk.Tk):
         self._gps_source.start(self._queue_fix, self._queue_error)
 
     def _reconfigure_level_meter(self) -> None:
+        params = self._collect_sdr_params()
+        backend = str(params["backend"])
+        if self._level_meter is not None and self._active_sdr_backend == backend:
+            self._level_meter.update_settings(params)
+            return
+
         if self._level_meter is not None:
             self._level_meter.close()
-        params = self._collect_sdr_params()
-        self._level_meter = create_level_meter(str(params["backend"]))
-        self._level_meter.configure(params)
+        new_meter = create_level_meter(backend)
+        new_meter.configure(params)
+        self._level_meter = new_meter
+        self._active_sdr_backend = backend
 
     def _toggle_logging(self) -> None:
         self._sync_logger_state()
@@ -541,6 +552,8 @@ class SurveyApp(tk.Tk):
             self._vars[param.key].set(str(value))
 
     def _param_value_in_range(self, param: ParameterDef, value: object) -> bool:
+        if param.kind == "choice" and param.choices:
+            return str(value) in {str(choice) for choice in param.choices}
         if param.kind not in ("int", "float"):
             return True
         numeric = float(value)

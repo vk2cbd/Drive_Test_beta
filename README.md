@@ -46,7 +46,7 @@ Text and numeric fields are committed when you press Enter in the field. When th
 
 Sample rate is entered in Msps, and IF bandwidth is entered in MHz. The app converts those values to Hz before configuring the SDR backend.
 
-SDR numeric fields with configured ranges reject invalid or out-of-range values and keep the last valid setting. Current guarded ranges include RF gain reduction 0 to 66 dB, IF gain reduction 0 to 66 dB, and LNA state 0 to 9.
+SDR numeric fields with configured ranges reject invalid or out-of-range values and keep the last valid setting. Current guarded ranges include RF gain reduction 0 to 66 dB, IF gain reduction 20 to 59 dB, and LNA state 0 to 9.
 
 CSV logging is controlled by the **Log to CSV** button. It always defaults to off when the app starts and is not remembered between sessions.
 
@@ -113,6 +113,8 @@ GPS time is converted from UTC to the computer's local timezone when the row is 
 ## Ubuntu SDRplay Setup
 
 For an SDRplay RSPdx, install the SDRplay API/runtime and a SoapySDR SDRplay module if you want to use the included `soapy_sdrplay` backend. The application keeps SDR configuration in the GUI and passes supported settings into the backend where possible.
+
+The app talks to the RSPdx through SoapySDR and the SoapySDR SDRplay API 3 plugin. The RSPdx has three software-selectable antenna ports; the GUI exposes antenna choices A, B, and C.
 
 If the app reports `SoapySDR::Device::make() no match`, SoapySDR cannot find a device matching the GUI's **Device args** field. First check whether SoapySDR can see the RSPdx:
 

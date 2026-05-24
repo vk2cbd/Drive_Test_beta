@@ -64,7 +64,6 @@ class SerialGpsSource:
         while not self._stop_event.is_set():
             try:
                 with serial.Serial(self.port, self.baud, timeout=1.0) as ser:
-                    on_error(f"GPS connected on {self.port}")
                     self._read_loop(ser, on_fix)
             except serial.SerialException as exc:
                 on_error(
