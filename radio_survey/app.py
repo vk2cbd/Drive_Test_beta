@@ -87,7 +87,7 @@ class SurveyApp(tk.Tk):
         self._last_plot_bounds: tuple[float, float, float, float, float, float, float, float] | None = None
         self._running = False
         self._last_measurement_signature: tuple[object, ...] | None = None
-        self._last_sampled_gps_second: int | None = None
+        self._last_sampled_gps_second: tuple[int, int, int] | None = None
 
         self._build_ui()
         self.protocol("WM_DELETE_WINDOW", self._on_close)
@@ -892,7 +892,7 @@ class SurveyApp(tk.Tk):
         if not isinstance(fix, GpsFix) or self._level_meter is None:
             return
         self._update_gps_display(fix)
-        gps_second = int(fix.timestamp_utc.timestamp())
+        gps_second = _gps_second_key(fix.timestamp_utc)
         if gps_second == self._last_sampled_gps_second:
             return
         try:
@@ -1222,6 +1222,10 @@ def main() -> None:
 
 def _format_local_time(timestamp_utc: datetime) -> str:
     return timestamp_utc.astimezone().strftime("%H:%M:%S %Z")
+
+
+def _gps_second_key(timestamp_utc: datetime) -> tuple[int, int, int]:
+    return timestamp_utc.hour, timestamp_utc.minute, timestamp_utc.second
 
 
 def _format_axis_time(epoch_s: float) -> str:

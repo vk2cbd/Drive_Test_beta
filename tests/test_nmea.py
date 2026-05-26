@@ -24,6 +24,13 @@ def test_parse_rmc_sentence_with_date() -> None:
     assert fix.bearing_deg == 31.66
 
 
+def test_parse_rmc_replaces_implausible_date_when_current_date_supplied() -> None:
+    fix = parse_nmea("$GPRMC,092751.000,A,5321.6802,N,00630.3372,W,0.06,31.66,101006,,,A*43", date(2026, 5, 26))
+
+    assert fix is not None
+    assert fix.timestamp_utc.isoformat() == "2026-05-26T09:27:51+00:00"
+
+
 def test_decimal_to_dms() -> None:
     assert decimal_to_dms(-33.8688, latitude=True).endswith("S")
     assert decimal_to_dms(151.2093, latitude=False).endswith("E")

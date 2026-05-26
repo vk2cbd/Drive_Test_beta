@@ -61,7 +61,7 @@ def _parse_rmc(parts: list[str], current_date: date | None) -> GpsFix | None:
         return None
 
     fix_time = _parse_time(parts[1])
-    fix_date = _parse_date(parts[9]) or current_date
+    fix_date = _resolve_fix_date(_parse_date(parts[9]), current_date)
     if fix_time is None or fix_date is None:
         return None
 
@@ -93,6 +93,16 @@ def _parse_date(value: str) -> date | None:
         return date(year, month, day)
     except (ValueError, IndexError):
         return None
+
+
+def _resolve_fix_date(parsed_date: date | None, current_date: date | None) -> date | None:
+    if parsed_date is None:
+        return current_date
+    if current_date is None:
+        return parsed_date
+    if abs((parsed_date - current_date).days) > 1:
+        return current_date
+    return parsed_date
 
 
 def _parse_lat_lon(value: str, hemisphere: str) -> float:

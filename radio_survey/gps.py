@@ -83,7 +83,7 @@ class SerialGpsSource:
             for raw in raw_bytes.decode("ascii", errors="ignore").splitlines():
                 raw = raw.strip()
                 if raw:
-                    fix = parse_nmea(raw)
+                    fix = parse_nmea(raw, datetime.now(timezone.utc).date())
                     if fix is not None:
                         on_fix(fix)
 
