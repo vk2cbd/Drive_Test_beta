@@ -87,6 +87,7 @@ class SurveyApp(tk.Tk):
         self._last_plot_bounds: tuple[float, float, float, float, float, float, float, float] | None = None
         self._running = False
         self._last_measurement_signature: tuple[object, ...] | None = None
+        self._last_sampled_gps_second: int | None = None
 
         self._build_ui()
         self.protocol("WM_DELETE_WINDOW", self._on_close)
@@ -287,6 +288,10 @@ class SurveyApp(tk.Tk):
         self.sdr_status_var = tk.StringVar(value="SDR not started")
         self.position_var = tk.StringVar(value="No fix")
         self.timestamp_var = tk.StringVar(value="-")
+        self.date_var = tk.StringVar(value="-")
+        self.fix_quality_var = tk.StringVar(value="-")
+        self.satellites_var = tk.StringVar(value="-")
+        self.bearing_var = tk.StringVar(value="-")
         self.level_var = tk.StringVar(value="-")
 
         for column, (label, var) in enumerate(
@@ -299,6 +304,18 @@ class SurveyApp(tk.Tk):
         ):
             ttk.Label(frame, text=label).grid(row=0, column=column, sticky="w")
             ttk.Label(frame, textvariable=var, font=("TkDefaultFont", 11, "bold")).grid(row=1, column=column, sticky="w")
+
+        for column, (label, var) in enumerate(
+            (
+                ("Date", self.date_var),
+                ("Fix quality", self.fix_quality_var),
+                ("Satellites", self.satellites_var),
+                ("Bearing", self.bearing_var),
+            )
+        ):
+            ttk.Label(frame, text=label).grid(row=2, column=column, sticky="w", pady=(8, 0))
+            ttk.Label(frame, textvariable=var, font=("TkDefaultFont", 11, "bold")).grid(row=3, column=column, sticky="w")
+
     def _build_plot_panel(self, parent: ttk.Frame) -> None:
         ttk.Label(parent, text="Spectrum (dBm)").grid(row=1, column=0, sticky="w", pady=(10, 2))
         ttk.Label(parent, text="Received Level (dBm)").grid(row=1, column=1, sticky="w", pady=(10, 2), padx=(10, 0))
@@ -394,10 +411,15 @@ class SurveyApp(tk.Tk):
             return
 
         self._running = True
+        self._last_sampled_gps_second = None
         self.start_button.configure(state="disabled")
         self.stop_button.configure(state="normal")
         self.position_var.set("No fix")
         self.timestamp_var.set("-")
+        self.date_var.set("-")
+        self.fix_quality_var.set("-")
+        self.satellites_var.set("-")
+        self.bearing_var.set("-")
         self.level_var.set("-")
         self.status_var.set("Running")
 
@@ -422,6 +444,7 @@ class SurveyApp(tk.Tk):
         self._level_meter = None
         self._active_sdr_backend = None
         self._last_measurement_signature = None
+        self._last_sampled_gps_second = None
         self._logger = None
 
     def _commit_all_settings(self) -> None:
@@ -868,6 +891,10 @@ class SurveyApp(tk.Tk):
     def _handle_fix(self, fix: GpsFix) -> None:
         if not isinstance(fix, GpsFix) or self._level_meter is None:
             return
+        self._update_gps_display(fix)
+        gps_second = int(fix.timestamp_utc.timestamp())
+        if gps_second == self._last_sampled_gps_second:
+            return
         try:
             raw_level = self._level_meter.read_level_dbm()
             level = self._apply_calibration(raw_level)
@@ -877,8 +904,7 @@ class SurveyApp(tk.Tk):
             self.status_var.set(str(exc))
             return
 
-        self.position_var.set(fix.position_dms)
-        self.timestamp_var.set(_format_local_time(fix.timestamp_utc))
+        self._last_sampled_gps_second = gps_second
         self.level_var.set(f"{level:.1f} dBm")
         point_time = time.time()
         self._points.append(LevelPoint(point_time, level))
@@ -887,6 +913,18 @@ class SurveyApp(tk.Tk):
         self._update_spectrum_average()
         self._redraw_spectrum()
         self._redraw_plot()
+
+    def _update_gps_display(self, fix: GpsFix) -> None:
+        local_timestamp = fix.timestamp_utc.astimezone()
+        self.position_var.set(fix.position_dms)
+        self.timestamp_var.set(local_timestamp.strftime("%H:%M:%S %Z"))
+        self.date_var.set(local_timestamp.strftime("%Y-%m-%d"))
+        if fix.quality is not None:
+            self.fix_quality_var.set(str(fix.quality))
+        if fix.satellites is not None:
+            self.satellites_var.set(str(fix.satellites))
+        if fix.bearing_deg is not None:
+            self.bearing_var.set(f"{fix.bearing_deg:.0f} deg")
 
     def _redraw_plot(self) -> None:
         canvas = self.canvas

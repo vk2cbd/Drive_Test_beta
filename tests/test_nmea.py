@@ -21,6 +21,7 @@ def test_parse_rmc_sentence_with_date() -> None:
     assert fix.timestamp_utc.isoformat() == "2011-05-28T09:27:51+00:00"
     assert round(fix.latitude_deg, 6) == 53.361337
     assert round(fix.longitude_deg, 6) == -6.505620
+    assert fix.bearing_deg == 31.66
 
 
 def test_decimal_to_dms() -> None:
