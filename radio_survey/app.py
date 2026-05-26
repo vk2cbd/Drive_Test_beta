@@ -307,9 +307,9 @@ class SurveyApp(tk.Tk):
 
         for column, (label, var) in enumerate(
             (
-                ("Date", self.date_var),
-                ("Fix quality", self.fix_quality_var),
                 ("Satellites", self.satellites_var),
+                ("Fix quality", self.fix_quality_var),
+                ("Date", self.date_var),
                 ("Bearing", self.bearing_var),
             )
         ):
