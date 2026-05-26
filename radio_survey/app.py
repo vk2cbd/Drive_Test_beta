@@ -305,6 +305,16 @@ class SurveyApp(tk.Tk):
             if param.units:
                 ttk.Label(frame, text=param.units).grid(row=row, column=column + 2, sticky="w")
 
+        ttk.Label(frame, text="SDR readback").grid(row=rows_per_group, column=0, sticky="nw", pady=(8, 0))
+        ttk.Label(frame, textvariable=self.sdr_status_var, wraplength=920, justify="left").grid(
+            row=rows_per_group,
+            column=1,
+            columnspan=8,
+            sticky="ew",
+            padx=4,
+            pady=(8, 0),
+        )
+
     def _build_status_panel(self, parent: ttk.Frame) -> None:
         frame = ttk.LabelFrame(parent, text="Realtime Data", padding=10)
         frame.grid(row=0, column=0, columnspan=2, sticky="ew")

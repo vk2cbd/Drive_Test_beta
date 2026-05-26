@@ -53,3 +53,27 @@ def test_channel_power_1_to_100_khz_noise_delta() -> None:
 def test_measurement_bandwidth_uses_gui_khz_parameter() -> None:
     assert _measurement_bandwidth_param_hz({"measurement_bandwidth_khz": 100.0}, 25_000.0) == 100_000.0
     assert _measurement_bandwidth_param_hz({"measurement_bandwidth_khz": 1.0}, 25_000.0) == 1_000.0
+
+
+class DummySdr:
+    def listSettings(self):
+        return ["lnaState", "hdrMode"]
+
+    def readSetting(self, *args):
+        key = args[-1]
+        if key == "lnaState":
+            return "3"
+        if key == "hdrMode":
+            return "false"
+        raise RuntimeError(key)
+
+
+def test_read_first_setting_uses_sdr_readback() -> None:
+    meter = SoapySdrplayLevelMeter()
+    meter._sdr = DummySdr()
+    meter._direction = 0
+    meter._channel = 0
+
+    assert meter._read_first_setting(("lnaState", "lnastate")) == "3"
+    assert meter._read_first_setting(("hdrMode",)) == "false"
+    assert meter._read_first_setting(("missing",)) is None

@@ -151,6 +151,7 @@ class SoapySdrplayLevelMeter:
         notes.append(self._set_antenna(str(params.get("antenna", "A"))))
         notes.extend(self._set_gain(params, warnings))
         notes.extend(self._write_settings(params, warnings))
+        notes.extend(self._actual_state_notes(params, warnings))
         self._stream = self._sdr.setupStream(self._direction, self._format, [self._channel])
         self._diagnostics = MeterDiagnostics(tuple(notes), tuple(warnings))
         self._start_reader()
@@ -182,6 +183,7 @@ class SoapySdrplayLevelMeter:
         notes.append(self._set_antenna(str(params.get("antenna", "A"))))
         notes.extend(self._set_gain(params, warnings))
         notes.extend(self._write_settings(params, warnings))
+        notes.extend(self._actual_state_notes(params, warnings))
         self._diagnostics = MeterDiagnostics(tuple(notes), tuple(warnings))
         self._start_reader()
 
@@ -426,6 +428,38 @@ class SoapySdrplayLevelMeter:
         )
         return tuple(applied)
 
+    def _actual_state_notes(self, params: dict[str, object], warnings: list[str]) -> tuple[str, ...]:
+        notes: list[str] = ["Actual SDR state"]
+        antenna = self._get_antenna()
+        if antenna is not None:
+            notes.append(f"antenna={antenna}")
+        gain_mode = self._get_gain_mode()
+        if gain_mode is not None:
+            notes.append(f"agc={'on' if gain_mode else 'off'}")
+        for gain_name in ("RFGR", "IFGR"):
+            gain = self._get_gain(gain_name)
+            if gain is not None:
+                notes.append(f"{gain_name}={gain:g} dB")
+        setting_map = {
+            "lna": ("lnaState", "lnastate", "lna_state"),
+            "hdr": ("hdrMode", "hdrmode", "rspdx_hdr", "hdr_ctrl"),
+            "biasT": ("biasT_ctrl", "biasT", "bias_t"),
+            "dabNotch": ("dabnotch_ctrl", "dabNotch", "dab_notch"),
+            "fmNotch": ("rfnotch_ctrl", "rfNotch", "rf_notch"),
+            "mwNotch": ("mwnotch_ctrl", "mwNotch", "mw_notch"),
+            "ifMode": ("if_mode", "ifMode", "IF_Mode"),
+            "loMode": ("lo_mode", "loMode", "LO_Mode"),
+            "decimation": ("decimation", "decimationFactor"),
+        }
+        for label, keys in setting_map.items():
+            value = self._read_first_setting(keys)
+            if value is not None:
+                notes.append(f"{label}={value}")
+        if len(notes) == 1:
+            warnings.append("No SDR readback settings were available")
+            return ()
+        return tuple(notes)
+
     def _effective_measurement_bandwidth_hz(self) -> float:
         return max(1.0, min(self._measurement_bandwidth_hz, self._bandwidth_hz, self._sample_rate_hz))
 
@@ -470,6 +504,25 @@ class SoapySdrplayLevelMeter:
             return float(self._sdr.getGain(self._direction, self._channel, name))
         except Exception:
             return None
+
+    def _get_gain_mode(self) -> bool | None:
+        try:
+            return bool(self._sdr.getGainMode(self._direction, self._channel))
+        except Exception:
+            return None
+
+    def _read_first_setting(self, keys: tuple[str, ...]) -> str | None:
+        available = self._available_setting_keys()
+        candidates = keys if not available else tuple(key for key in keys if key in available)
+        for key in candidates:
+            try:
+                return str(self._sdr.readSetting(self._direction, self._channel, key))
+            except Exception:
+                try:
+                    return str(self._sdr.readSetting(key))
+                except Exception:
+                    continue
+        return None
 
 
 def create_level_meter(backend: str) -> LevelMeter:

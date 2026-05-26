@@ -1,6 +1,6 @@
 # Radio Network Survey Logger
 
-Version: `0.4.11-beta`
+Version: `0.4.12-beta`
 
 Python GUI application for surveying a radio network with:
 
@@ -47,6 +47,8 @@ Text and numeric fields are committed when you press Enter in the field. When th
 Sample rate is entered in Msps, and IF bandwidth is entered in MHz. The app converts those values to Hz before configuring the SDR backend.
 
 SDR numeric fields with configured ranges reject invalid or out-of-range values and keep the last valid setting. Current guarded ranges include RF gain reduction 0 to 66 dB, IF gain reduction 20 to 59 dB, and LNA state 0 to 9.
+
+The SDR Parameters panel includes an **SDR readback** line. For SDRplay hardware this reports actual values returned by SoapySDR where available, including antenna, AGC state, RFGR, IFGR, and supported SDRplay settings such as LNA state, HDR mode, Bias-T, and notch states. If a driver setting cannot be read back, it is reported as unavailable or omitted rather than shown as confirmed.
 
 CSV logging is controlled by the **Log to CSV** button. It always defaults to off when the app starts and is not remembered between sessions.
 
