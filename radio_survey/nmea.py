@@ -12,7 +12,7 @@ class GpsFix:
     altitude_m: float | None = None
     quality: int | None = None
     satellites: int | None = None
-    bearing_deg: float | None = None
+    speed_kmh: float | None = None
 
     @property
     def position_dms(self) -> str:
@@ -69,7 +69,7 @@ def _parse_rmc(parts: list[str], current_date: date | None) -> GpsFix | None:
         timestamp_utc=datetime.combine(fix_date, fix_time, tzinfo=timezone.utc),
         latitude_deg=_parse_lat_lon(parts[3], parts[4]),
         longitude_deg=_parse_lat_lon(parts[5], parts[6]),
-        bearing_deg=_safe_float(parts[8]),
+        speed_kmh=_knots_to_kmh(_safe_float(parts[7])),
     )
 
 
@@ -137,6 +137,10 @@ def _safe_float(value: str) -> float | None:
         return float(value)
     except ValueError:
         return None
+
+
+def _knots_to_kmh(value: float | None) -> float | None:
+    return None if value is None else value * 1.852
 
 
 def _safe_int(value: str) -> int | None:

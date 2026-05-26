@@ -291,7 +291,7 @@ class SurveyApp(tk.Tk):
         self.date_var = tk.StringVar(value="-")
         self.fix_quality_var = tk.StringVar(value="-")
         self.satellites_var = tk.StringVar(value="-")
-        self.bearing_var = tk.StringVar(value="-")
+        self.speed_var = tk.StringVar(value="-")
         self.level_var = tk.StringVar(value="-")
 
         for column, (label, var) in enumerate(
@@ -310,7 +310,7 @@ class SurveyApp(tk.Tk):
                 ("Satellites", self.satellites_var),
                 ("Fix quality", self.fix_quality_var),
                 ("Date", self.date_var),
-                ("Bearing", self.bearing_var),
+                ("Speed km/h", self.speed_var),
             )
         ):
             ttk.Label(frame, text=label).grid(row=2, column=column, sticky="w", pady=(8, 0))
@@ -419,7 +419,7 @@ class SurveyApp(tk.Tk):
         self.date_var.set("-")
         self.fix_quality_var.set("-")
         self.satellites_var.set("-")
-        self.bearing_var.set("-")
+        self.speed_var.set("-")
         self.level_var.set("-")
         self.status_var.set("Running")
 
@@ -923,8 +923,8 @@ class SurveyApp(tk.Tk):
             self.fix_quality_var.set(str(fix.quality))
         if fix.satellites is not None:
             self.satellites_var.set(str(fix.satellites))
-        if fix.bearing_deg is not None:
-            self.bearing_var.set(f"{fix.bearing_deg:.0f} deg")
+        if fix.speed_kmh is not None:
+            self.speed_var.set(f"{fix.speed_kmh:.1f}")
 
     def _redraw_plot(self) -> None:
         canvas = self.canvas
