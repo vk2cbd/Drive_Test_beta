@@ -118,6 +118,12 @@ class SoapySdrplayLevelMeter:
             getattr(SoapySDR, "SOAPY_SDR_OVERFLOW", -4),
             getattr(SoapySDR, "SOAPY_SDR_TIMEOUT", -1),
         }
+        self._fatal_read_codes = {
+            getattr(SoapySDR, "SOAPY_SDR_STREAM_ERROR", -2),
+            getattr(SoapySDR, "SOAPY_SDR_CORRUPTION", -3),
+            getattr(SoapySDR, "SOAPY_SDR_NOT_SUPPORTED", -5),
+            getattr(SoapySDR, "SOAPY_SDR_TIME_ERROR", -6),
+        }
         self._samples_per_level = int(params.get("samples_per_level", 8192))
         self._dbm_offset = float(params.get("dbm_offset", -30.0))
         self._center_frequency_hz = float(params["center_frequency_hz"])
@@ -215,6 +221,8 @@ class SoapySdrplayLevelMeter:
         if self._sdr is not None and self._stream is not None:
             try:
                 self._sdr.closeStream(self._stream)
+            except Exception:
+                pass
             finally:
                 self._stream = None
                 self._sdr = None
@@ -227,8 +235,10 @@ class SoapySdrplayLevelMeter:
 
     def _deactivate_stream(self) -> None:
         if self._stream_active:
-            self._sdr.deactivateStream(self._stream)
-            self._stream_active = False
+            try:
+                self._sdr.deactivateStream(self._stream)
+            finally:
+                self._stream_active = False
 
     def _start_reader(self) -> None:
         if self._stream is None:
@@ -244,7 +254,10 @@ class SoapySdrplayLevelMeter:
         if self._reader_thread is not None:
             self._reader_thread.join(timeout=1.0)
             self._reader_thread = None
-        self._deactivate_stream()
+        try:
+            self._deactivate_stream()
+        except Exception:
+            self._stream_active = False
 
     def _reader_loop(self) -> None:
         while not self._stop_reader.is_set():
@@ -268,6 +281,9 @@ class SoapySdrplayLevelMeter:
                     with self._condition:
                         self._last_error = f"SDR read failed with code {code}"
                         self._condition.notify_all()
+                    if code in self._fatal_read_codes:
+                        self._stop_reader.set()
+                        break
                     time.sleep(0.25)
             except Exception as exc:
                 with self._condition:

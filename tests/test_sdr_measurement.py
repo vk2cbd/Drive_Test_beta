@@ -77,3 +77,24 @@ def test_read_first_setting_uses_sdr_readback() -> None:
     assert meter._read_first_setting(("lnaState", "lnastate")) == "3"
     assert meter._read_first_setting(("hdrMode",)) == "false"
     assert meter._read_first_setting(("missing",)) is None
+
+
+class FailingCloseSdr:
+    def closeStream(self, stream):
+        raise RuntimeError("native service disappeared")
+
+    def deactivateStream(self, stream):
+        raise RuntimeError("native service disappeared")
+
+
+def test_close_tolerates_native_sdr_service_failure() -> None:
+    meter = SoapySdrplayLevelMeter()
+    meter._sdr = FailingCloseSdr()
+    meter._stream = object()
+    meter._stream_active = True
+
+    meter.close()
+
+    assert meter._sdr is None
+    assert meter._stream is None
+    assert meter._stream_active is False

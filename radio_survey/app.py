@@ -52,6 +52,7 @@ CALIBRATION_TARGETS: tuple[tuple[str, float | None], ...] = (
     ("1 dB compression", None),
 )
 GPS_FIX_STALE_SECONDS = 3.0
+MAX_CONSECUTIVE_SDR_ERRORS = 3
 
 
 class SurveyApp(tk.Tk):
@@ -106,6 +107,7 @@ class SurveyApp(tk.Tk):
         self._survey_started_monotonic_s: float | None = None
         self._gps_fix_stale = False
         self._gps_serial_error_active = False
+        self._consecutive_sdr_errors = 0
 
         self._build_ui()
         self.protocol("WM_DELETE_WINDOW", self._on_close)
@@ -460,6 +462,7 @@ class SurveyApp(tk.Tk):
         self._survey_started_monotonic_s = time.monotonic()
         self._gps_fix_stale = False
         self._gps_serial_error_active = False
+        self._consecutive_sdr_errors = 0
         self.start_button.configure(state="disabled")
         self.stop_button.configure(state="normal")
         self._clear_stale_realtime_fields()
@@ -492,6 +495,7 @@ class SurveyApp(tk.Tk):
         self._gps_fix_stale = False
         self._gps_serial_error_active = False
         self._logger = None
+        self._consecutive_sdr_errors = 0
 
     def _commit_all_settings(self) -> None:
         try:
@@ -1022,8 +1026,10 @@ class SurveyApp(tk.Tk):
             if self.logging_enabled_var.get() and self._logger is not None:
                 self._logger.write(fix, level)
         except Exception as exc:
-            self.status_var.set(str(exc))
+            self._handle_sdr_error(exc)
             return
+
+        self._consecutive_sdr_errors = 0
 
         self._last_sampled_gps_second = gps_second
         self.level_var.set(f"{level:.1f} dBm")
@@ -1034,6 +1040,22 @@ class SurveyApp(tk.Tk):
         self._update_spectrum_average()
         self._redraw_spectrum()
         self._redraw_plot()
+
+    def _handle_sdr_error(self, exc: Exception) -> None:
+        self._consecutive_sdr_errors += 1
+        message = str(exc)
+        if self._consecutive_sdr_errors < MAX_CONSECUTIVE_SDR_ERRORS:
+            self.status_var.set(message)
+            return
+        self._cleanup()
+        self._running = False
+        self.start_button.configure(state="normal")
+        self.stop_button.configure(state="disabled")
+        self._clear_stale_realtime_fields()
+        self.sdr_status_var.set("SDR not started")
+        self.status_var.set(
+            "SDR/API service failed. Restart sdrplay.service and start the survey again."
+        )
 
     def _check_gps_stale(self) -> None:
         if not self._running or self._gps_fix_stale or self._gps_serial_error_active:

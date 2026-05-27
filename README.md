@@ -1,6 +1,6 @@
 # Radio Network Survey Logger
 
-Version: `0.4.17-beta`
+Version: `0.4.18-beta`
 
 Python GUI application for surveying a radio network with:
 
@@ -167,6 +167,17 @@ If `--find` does not list an SDRplay device, install or repair the SDRplay API/r
 
 ```text
 driver=sdrplay
+```
+
+If the native SDRplay API service crashes, for example Ubuntu reports
+`sdrplay_apiService crashed with SIGSEGV in libusb_open()`, the app cannot
+repair the native service from Python. The beta app will now stop the survey
+cleanly after repeated SDR read failures and show an SDR/API failure status.
+Restart the SDRplay API service before starting the survey again:
+
+```bash
+sudo systemctl restart sdrplay.service
+systemctl status sdrplay.service
 ```
 
 SDRconnect introduced a WebSocket/module system after v1.0.5. A future backend can be added under `radio_survey/sdr.py` if you want this app to drive SDRconnect directly rather than sample the SDR through SoapySDR.
