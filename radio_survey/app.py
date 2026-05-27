@@ -50,6 +50,7 @@ CALIBRATION_TARGETS: tuple[tuple[str, float | None], ...] = (
     ("-40 dBm", -40.0),
     ("1 dB compression", None),
 )
+GPS_FIX_STALE_SECONDS = 3.0
 
 
 class SurveyApp(tk.Tk):
@@ -99,6 +100,9 @@ class SurveyApp(tk.Tk):
         self._running = False
         self._last_measurement_signature: tuple[object, ...] | None = None
         self._last_sampled_gps_second: tuple[int, int, int] | None = None
+        self._last_fix_monotonic_s: float | None = None
+        self._survey_started_monotonic_s: float | None = None
+        self._gps_stale_reported = False
 
         self._build_ui()
         self.protocol("WM_DELETE_WINDOW", self._on_close)
@@ -449,15 +453,12 @@ class SurveyApp(tk.Tk):
 
         self._running = True
         self._last_sampled_gps_second = None
+        self._last_fix_monotonic_s = None
+        self._survey_started_monotonic_s = time.monotonic()
+        self._gps_stale_reported = False
         self.start_button.configure(state="disabled")
         self.stop_button.configure(state="normal")
-        self.position_var.set("No fix")
-        self.timestamp_var.set("-")
-        self.date_var.set("-")
-        self.fix_quality_var.set("-")
-        self.satellites_var.set("-")
-        self.speed_var.set("-")
-        self.level_var.set("-")
+        self._clear_stale_realtime_fields()
         self.status_var.set("Running")
 
     def _stop(self) -> None:
@@ -482,6 +483,9 @@ class SurveyApp(tk.Tk):
         self._active_sdr_backend = None
         self._last_measurement_signature = None
         self._last_sampled_gps_second = None
+        self._last_fix_monotonic_s = None
+        self._survey_started_monotonic_s = None
+        self._gps_stale_reported = False
         self._logger = None
 
     def _commit_all_settings(self) -> None:
@@ -970,11 +974,14 @@ class SurveyApp(tk.Tk):
                 self._handle_fix(payload)
             elif event == "error":
                 self.status_var.set(str(payload))
+        self._check_gps_stale()
         self.after(100, self._process_events)
 
     def _handle_fix(self, fix: GpsFix) -> None:
         if not isinstance(fix, GpsFix) or self._level_meter is None:
             return
+        self._last_fix_monotonic_s = time.monotonic()
+        self._gps_stale_reported = False
         self._update_gps_display(fix)
         gps_second = _gps_second_key(fix.timestamp_utc)
         if gps_second == self._last_sampled_gps_second:
@@ -997,6 +1004,28 @@ class SurveyApp(tk.Tk):
         self._update_spectrum_average()
         self._redraw_spectrum()
         self._redraw_plot()
+
+    def _check_gps_stale(self) -> None:
+        if not self._running or self._gps_stale_reported:
+            return
+        if self._last_fix_monotonic_s is None:
+            started_s = self._survey_started_monotonic_s or time.monotonic()
+            if time.monotonic() - started_s < GPS_FIX_STALE_SECONDS:
+                return
+        elif time.monotonic() - self._last_fix_monotonic_s < GPS_FIX_STALE_SECONDS:
+            return
+        self._clear_stale_realtime_fields()
+        self.status_var.set("GPS fix lost")
+        self._gps_stale_reported = True
+
+    def _clear_stale_realtime_fields(self) -> None:
+        self.position_var.set("No fix")
+        self.timestamp_var.set("-")
+        self.date_var.set("-")
+        self.fix_quality_var.set("-")
+        self.satellites_var.set("-")
+        self.speed_var.set("-")
+        self.level_var.set("-")
 
     def _update_gps_display(self, fix: GpsFix) -> None:
         local_timestamp = fix.timestamp_utc.astimezone()

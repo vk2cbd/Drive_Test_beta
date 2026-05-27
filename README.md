@@ -1,6 +1,6 @@
 # Radio Network Survey Logger
 
-Version: `0.4.13-beta`
+Version: `0.4.14-beta`
 
 Python GUI application for surveying a radio network with:
 
@@ -59,6 +59,8 @@ The spectrum display sits to the left of the received-level plot. Its frequency 
 The received-level plot now uses the **Power meas BW** field, in kHz, to measure channel power around the configured center frequency instead of always using the full SDR bandwidth. The effective measurement bandwidth is capped by the configured sample rate and IF bandwidth. This usually makes a narrow signal-generator carrier much easier to see. The value is still relative until calibrated with **dBm calibration offset**.
 
 If the GPS emits more than one valid position sentence for the same GPS second, such as both RMC and GGA, the app updates the realtime GPS metadata but only records one SDR level sample, plot point, and CSV row for that second. If an RMC sentence reports an implausible date, the app uses the current UTC date so stale GPS dates do not defeat this de-duplication.
+
+If no valid GPS fix is received for more than three seconds while the survey is running, the app changes status to **GPS fix lost** and clears the realtime GPS and level fields so stale data is not presented as current. Existing plot history remains visible.
 
 Changing the plot time window or SDR parameters only changes newly plotted samples. It does not delete the in-memory display history for the current app session, so parameter changes can be compared on the same trace. The plot window control sits below the received-level plot. The received-level plot advances only when GPS fixes add new samples, draws vertical time graticles at 25%, 50%, and 75% of the visible time span, can be zoomed by dragging a visible rectangle with the mouse, and the **Back** button returns to the previous plot view. Returning from a drag zoom to the normal scrolling view allows new GPS samples to scroll the plot again.
 
