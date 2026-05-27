@@ -1,4 +1,4 @@
-from radio_survey.app import SurveyApp
+from radio_survey.app import SurveyApp, _format_spectrum_frequency_label, _spectrum_axis_bounds_for_settings
 from radio_survey.config import SDR_PARAMETER_DEFS
 
 
@@ -40,3 +40,16 @@ def test_rf_fm_notch_duplicate_control_removed() -> None:
 
     assert "rf_notch" not in keys
     assert "fm_notch" in keys
+
+
+def test_spectrum_axis_uses_configured_center_and_effective_bandwidth() -> None:
+    x_min, x_max = _spectrum_axis_bounds_for_settings(422.2, 1.536, 1.0, 421.7002, 422.6997)
+
+    assert round(x_min, 6) == 421.7
+    assert round((x_min + x_max) / 2.0, 6) == 422.2
+    assert round(x_max, 6) == 422.7
+
+
+def test_spectrum_axis_frequency_label_precision() -> None:
+    assert _format_spectrum_frequency_label(422.199999, 1.0) == "422.200"
+    assert _format_spectrum_frequency_label(422.199999, 0.05) == "422.2000"

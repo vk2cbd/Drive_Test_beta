@@ -1341,8 +1341,7 @@ class SurveyApp(tk.Tk):
         if frequencies is None or powers is None or not frequencies or not powers:
             canvas.create_text(width / 2, height / 2, text="Waiting for spectrum", fill="#d7e0ea", font=("TkDefaultFont", 13))
             return
-        x_min = min(frequencies)
-        x_max = max(frequencies)
+        x_min, x_max = self._spectrum_axis_bounds(frequencies)
         if x_max <= x_min:
             return
 
@@ -1365,10 +1364,12 @@ class SurveyApp(tk.Tk):
             power_label = high - (high - low) * fraction
             freq_label = x_min + (x_max - x_min) * fraction
             canvas.create_text(margin_left - 8, y, text=f"{power_label:.0f}", fill="#d7e0ea", anchor="e", font=("TkDefaultFont", 9))
-            canvas.create_text(x, height - 18, text=f"{freq_label:.3f}", fill="#d7e0ea", anchor="n", font=("TkDefaultFont", 9))
+            canvas.create_text(x, height - 18, text=_format_spectrum_frequency_label(freq_label, x_max - x_min), fill="#d7e0ea", anchor="n", font=("TkDefaultFont", 9))
 
         coords: list[float] = []
         for frequency, power in zip(frequencies, powers):
+            if frequency < x_min or frequency > x_max:
+                continue
             x = margin_left + (frequency - x_min) / (x_max - x_min) * plot_w
             clipped_power = max(low, min(high, power))
             y = margin_top + (high - clipped_power) / (high - low) * plot_h
@@ -1377,6 +1378,17 @@ class SurveyApp(tk.Tk):
         if len(coords) >= 4:
             canvas.create_line(*coords, fill="#f7d35c", width=1)
         canvas.create_text(width - margin_right, height - 4, text="MHz", fill="#d7e0ea", anchor="se", font=("TkDefaultFont", 9))
+
+    def _spectrum_axis_bounds(self, frequencies: tuple[float, ...]) -> tuple[float, float]:
+        fallback_min = min(frequencies)
+        fallback_max = max(frequencies)
+        try:
+            center_mhz = float(self._vars["center_frequency_mhz"].get())
+            bandwidth_mhz = float(self._vars["bandwidth_mhz"].get())
+            sample_rate_msps = float(self._vars["sample_rate_msps"].get())
+        except (KeyError, TypeError, ValueError, tk.TclError):
+            return fallback_min, fallback_max
+        return _spectrum_axis_bounds_for_settings(center_mhz, bandwidth_mhz, sample_rate_msps, fallback_min, fallback_max)
 
     def _update_spectrum_average(self) -> None:
         spectrum = self._level_meter.get_last_spectrum() if self._level_meter is not None else None
@@ -1426,3 +1438,26 @@ def _gps_second_key(timestamp_utc: datetime) -> tuple[int, int, int]:
 
 def _format_axis_time(epoch_s: float) -> str:
     return datetime.fromtimestamp(epoch_s).strftime("%H:%M:%S")
+
+
+def _spectrum_axis_bounds_for_settings(
+    center_mhz: float,
+    bandwidth_mhz: float,
+    sample_rate_msps: float,
+    fallback_min_mhz: float,
+    fallback_max_mhz: float,
+) -> tuple[float, float]:
+    effective_span_mhz = min(float(bandwidth_mhz), float(sample_rate_msps))
+    if effective_span_mhz <= 0.0:
+        return fallback_min_mhz, fallback_max_mhz
+    center_mhz = round(float(center_mhz), 6)
+    half_span_mhz = effective_span_mhz / 2.0
+    return center_mhz - half_span_mhz, center_mhz + half_span_mhz
+
+
+def _format_spectrum_frequency_label(frequency_mhz: float, span_mhz: float) -> str:
+    if span_mhz < 0.01:
+        return f"{frequency_mhz:.6f}"
+    if span_mhz < 0.1:
+        return f"{frequency_mhz:.4f}"
+    return f"{frequency_mhz:.3f}"
