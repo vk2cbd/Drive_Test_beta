@@ -66,13 +66,10 @@ class SerialGpsSource:
                 with serial.Serial(self.port, self.baud, timeout=1.0) as ser:
                     self._read_loop(ser, on_fix)
             except serial.SerialException as exc:
-                on_error(
-                    "GPS serial read failed. Check that the GPS is still plugged in and that "
-                    f"gpsd or ModemManager is not also using {self.port}: {exc}"
-                )
+                on_error(f"GPS serial error on {self.port}")
                 self._stop_event.wait(2.0)
             except Exception as exc:
-                on_error(f"GPS error: {exc}. On Ubuntu, check the port path and dialout group permissions.")
+                on_error(f"GPS error on {self.port}")
                 self._stop_event.wait(2.0)
 
     def _read_loop(self, ser: object, on_fix: FixCallback) -> None:

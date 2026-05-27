@@ -103,6 +103,7 @@ class SurveyApp(tk.Tk):
         self._last_fix_monotonic_s: float | None = None
         self._survey_started_monotonic_s: float | None = None
         self._gps_stale_reported = False
+        self._gps_serial_error_active = False
 
         self._build_ui()
         self.protocol("WM_DELETE_WINDOW", self._on_close)
@@ -456,6 +457,7 @@ class SurveyApp(tk.Tk):
         self._last_fix_monotonic_s = None
         self._survey_started_monotonic_s = time.monotonic()
         self._gps_stale_reported = False
+        self._gps_serial_error_active = False
         self.start_button.configure(state="disabled")
         self.stop_button.configure(state="normal")
         self._clear_stale_realtime_fields()
@@ -486,6 +488,7 @@ class SurveyApp(tk.Tk):
         self._last_fix_monotonic_s = None
         self._survey_started_monotonic_s = None
         self._gps_stale_reported = False
+        self._gps_serial_error_active = False
         self._logger = None
 
     def _commit_all_settings(self) -> None:
@@ -973,7 +976,7 @@ class SurveyApp(tk.Tk):
             if event == "fix":
                 self._handle_fix(payload)
             elif event == "error":
-                self.status_var.set(str(payload))
+                self._handle_gps_error(str(payload))
         self._check_gps_stale()
         self.after(100, self._process_events)
 
@@ -982,6 +985,7 @@ class SurveyApp(tk.Tk):
             return
         self._last_fix_monotonic_s = time.monotonic()
         self._gps_stale_reported = False
+        self._gps_serial_error_active = False
         self._update_gps_display(fix)
         gps_second = _gps_second_key(fix.timestamp_utc)
         if gps_second == self._last_sampled_gps_second:
@@ -1006,7 +1010,7 @@ class SurveyApp(tk.Tk):
         self._redraw_plot()
 
     def _check_gps_stale(self) -> None:
-        if not self._running or self._gps_stale_reported:
+        if not self._running or self._gps_stale_reported or self._gps_serial_error_active:
             return
         if self._last_fix_monotonic_s is None:
             started_s = self._survey_started_monotonic_s or time.monotonic()
@@ -1017,6 +1021,11 @@ class SurveyApp(tk.Tk):
         self._clear_stale_realtime_fields()
         self.status_var.set("GPS fix lost")
         self._gps_stale_reported = True
+
+    def _handle_gps_error(self, message: str) -> None:
+        self._gps_serial_error_active = True
+        self._clear_stale_realtime_fields()
+        self.status_var.set(message)
 
     def _clear_stale_realtime_fields(self) -> None:
         self.position_var.set("No fix")
